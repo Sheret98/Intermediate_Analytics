@@ -1,0 +1,436 @@
+---
+title: "
+  \\vspace{0.2in} \n \n \n Basketball Prediction\n \\vspace{0.1in} "
+author: "Shinda Sheret"
+date: "February 18, 2023"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  fig_caption: yes
+  html_notebook: default
+  extra_dependencies: ["float"]
+
+---
+\newpage
+
+
+## Introduction
+
+Since the 20th century, sport has grown rich in the world. Games like basketball, tennis and golf get undivided attention and these statistics are used for predicting scores of various games. 
+For the final project we've chosen a dataset from nbastuffer.com. For the initial analysis we tried to perform various aspects of the dataset and tried to explore the dataset's descriptive statistics i.e., structure, summary of the dataset and the exploratory data analysis. It is important to understand how all the variables are related and is there a positive correlation or negative correlation. For the predictive analysis, we will be using regression models. 
+
+The business questions posed in this report are
+$$
+$$
+*Predict points scored using the basketball statistics, 2 point shots attempted, 3 point shots attempted, free throws attempted, assists per game and steals per game* - To predict the total number of points per game scored by the basketball player, we are using the individual's attributes from the basketball statistics, to identify a model that better fits the question posed.
+
+*Predict position of the player* - To predict the position in which the player is playing, we use their characteristics in the court such as their steals, usage, rebounds and assists. The positions that are present in the dataset are Center (C), ComboForward (C-F), Forward (F), Forward/Center (F-C), Forward/Guard (F-G), Point Guard (G) and G-F (Guard/Forward).
+
+
+## Methods
+
+#### Business Question 1  
+
+*Predict points scored using the basketball statistics, two point shot attempts, three point shot attempts, free throw attempts, assists and steals per game.*  
+
+*Linear Regression Model*
+
+In order to predict the points scored during the games, we utilize **Linear Regression Model** on the predictor variable points per game against the response variables X2PA for two point shot attempts, X3PA for three point shot attempts, FTA for free throw attempts, APG for assists and SPG for steals per game. Linear regression is a statistical method that enables us to identify the relationship between two or more variables. This helps us understand the ability of a non-dependent variable to have an impact on the dependent variable. In linear regression, the variables are related through an equation i.e., the power is 1 (exponent).
+
+#### Business Question 2  
+
+*Predict position of the player*  
+
+*Decision Tree Classification*
+
+The positions of the players available in the dataset are Center (C), Combo-Forward (C-F), Forward (F), Forward/Center (F-C), Forward/Guard (F-G), Point Guard (G) and G-F (Guard/Forward). In order to predict the position in which the player would be playing during the game, we utilize **Decision Tree Classification** based on the rebounds, blocks, assists and usage of the players. These variables were considered to provide better accuracy rate. Decision trees give some predictive value based on the output given to the algorithm. Packages “rpart” and “rpart.plot”, rpart is used for regression and classification of a decision tree and rpart.plot is used for visualization of the decision tree.The top node is the root node and each external node in a decision tree is the leaf node which is also the output.
+
+## Analysis
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "")
+```
+
+
+#### Exploratory Data Analysis
+
+Our project is a national basketball association dataset that contains information of all basketball players. The dataset has 506 observations and 29 variables. This data is from the year 2022-2023. It has several attributes like team, position, age, turnover rate, points, effective shooting percentage, true shooting percentage, rebounds, total rebounds points, assists, assist percentage, steals, blocked, turnover, versatility index, offensive rating, defensive rating, usage rate and minutes percentage etc. There are a lot of null values in the dataset which can be imputed. In Exploratory Data Analysis we aim to identify anomalies, if any, are present in the dataset and eliminate them. It is also a crucial step in finding the descriptive statistics of the numerical data and visualizing the patterns of the variables and how they are related to each other.
+
+#### Install Packages
+$$
+$$
+
+```{r}
+install.packages("kableExtra", repos = "http://cran.us.r-project.org")
+library(kableExtra)
+install.packages("BasketballAnalyzeR", repos = "http://cran.us.r-project.org")
+install.packages("RColorBrewer", repos = "http://cran.us.r-project.org")
+install.packages("caret", repos = "http://cran.us.r-project.org")
+install.packages("hardhat", repos = "http://cran.us.r-project.org")
+install.packages("magrittr", repos = "http://cran.us.r-project.org") 
+install.packages("dplyr", repos = "http://cran.us.r-project.org")
+library(magrittr)
+library(caret)
+library(gridExtra)
+library(BasketballAnalyzeR)
+library(RColorBrewer)
+library(psych)
+library(Hmisc)
+library(dplyr)
+library(ggplot2)
+library(corrr)
+library(corrplot)
+library(leaps)
+library(car)
+library(rpart)
+library(rpart.plot)
+```
+
+#### Load Dataset
+$$
+$$
+
+```{r}
+nba <- read.csv("/Users/shindasheret/Desktop/Intermediate Analytics/Team Project/NBA_Stats_202223_1.csv", header = TRUE,sep = ",",stringsAsFactors = FALSE)
+kbl(head(nba), caption = "A Table of First 5 Rows of the NBA Dataset",
+    booktabs = T) %>%
+  kable_styling(latex_options =c("striped", "scale_down","hold_position"),
+                stripe_color = "gray!15",full_width = F)
+```
+
+#### Descriptive Statistics
+$$
+$$
+
+The describe function provides access to a multitude of statistical data. The mean is the center tendency that all sets of numeric data receive, although the median is also provided for vectors along with the other quantiles. It provides the value range but neither the sample variance nor the standard deviation.
+
+```{r}
+summary_nba <- summary(nba)
+write.table(nba, "summary_nba.csv", sep=",")
+kbl(psych::describe(nba), caption = "Descriptive Statistics of NBA Dataset",
+    booktabs = T) %>%
+  kable_styling(latex_options =c("striped", "scale_down","hold_position"),
+                stripe_color = "gray!15",full_width = F)
+```
+
+#### Impute Missing Values
+$$
+$$
+
+The variables Offensive Rating (ORTG) and Defensive Rating (DRTG) have the most missing values of 34 and 33 while other fields such as Effective Shooting Percentage (eFG_P), True Shooting Percentage (TS_P) and Turnover Rate (TO) have fewer missing values.
+
+```{r}
+na_count <-sapply(nba, function(nba) sum(length(which(is.na(nba)))))
+na_count
+```
+ 
+In order to eliminate the null values, we replace them with 0.
+
+```{r}
+
+to <- impute(nba$TO, 0)
+head(to)
+nba$TO[is.na(nba$TO)] <- 0
+
+eFG <- impute(nba$eFG_P, 0)
+head(eFG)
+nba$eFG[is.na(nba$eFG_P)] <- 0
+
+TS <- impute(nba$TS_P, 0)
+head(TS)
+nba$TS[is.na(nba$TS_P)] <- 0
+
+ORT <- impute(nba$ORTG, 0) 
+head(ORT)
+nba$ORTG[is.na(nba$ORTG)] <- 0
+
+DRT <- impute(nba$DRTG, 0)
+head(DRT)
+nba$DRTG[is.na(nba$DRTG)] <- 0
+
+```
+
+#### Relationship between points per game, type of shots and players of a team.
+$$
+$$
+
+```{r plot1, fig.cap='Relationship between points, type of shots and players of Golden State Warriors', fig.pos="H"}
+data1 <- subset(nba, TEAM=="Gol")
+data1 <- as.data.frame(data1)
+barline(data=data1, id="FULL.NAME",
+        bars=c("X2PA","X3PA","FTA"), line="PPG",
+        order.by="PPG", labels.bars=c("2PA","3PA","FTA"),
+        title="Golden State Warriors")
+```
+  
+The above barline plot was created for the Golden State Warriers. It shows the statistics for all the players from GSW and their total 2 point shots, 3 point shots and free throws attempted. It looks like all the players attempted 2 point shots followed by 3 point shots. Jordan Poole attempted the most 2 point shots while Stephen Curry attempted the most 2 point shots and achieved maximum points per game.
+
+Although our model does not focus on predicting the points scored based on the teams, this visualization does help us look at players in each team who frequently attempt 2 point shots, 3 point shots and free throws. This visualization can be applied to all the basketball team players to determine top players and their points scored based off their throw attempts.
+
+#### Plotting top three free throw percentage of players of each team.
+$$
+$$
+
+```{r plot2, fig.cap='Top three players with highest free throw percentage from each team', fig.pos="H"}
+ft <- nba
+ft1 <- select(ft, TEAM, FT_P, FULL.NAME)
+ft1 <- data.frame(ft1)
+ft2 <- filter(ft1, FT_P >= 0.5)
+
+ft2 %>%
+  group_by(FULL.NAME, TEAM) %>%
+  filter(FT_P == max(FT_P, na.rm=TRUE))
+
+ft3 <- ft2 %>% 
+arrange(desc(FT_P)) %>% 
+group_by(TEAM) %>% slice(1:3)
+
+
+colourCount = length(unique(ft2$TEAM))
+getPalette = colorRampPalette(brewer.pal(9, "Set1"))
+
+ggplot(data = ft3, 
+       aes(x = FULL.NAME, y = FT_P, color = TEAM)) + 
+  geom_point(size = 1) +
+  theme_dark() +
+  scale_fill_manual(values = getPalette(colourCount))+
+  #scale_color_brewer(palette = getPalette(colourCount)) +
+  theme(axis.text.x = element_text(size = 3, angle = 45),
+        axis.text.y = element_text(size = 6, angle = 45)) +
+  ylab("Free Throw Percentage")
+```
+  
+The above scatter plot shows the list of top three players from each team who had the highest percentage of free throws. Among the 15 teams who had players get a total 1% of free throws, the teams Minnesota Timberwolves and Washington Wizards have all top three players with a 1% free throw followed by Toronto Raptors with top two players with 1% free throws. The other teams have an average of free throws between 0.90 and 0.85.
+
+#### Density plot of player output
+$$
+$$
+
+```{r plot3, fig.cap='Density plot of player output per game', fig.pos="H"}
+points_density <- ggplot(nba, aes(PPG)) + geom_density(fill = "royalblue1") + geom_vline(aes(xintercept = mean(PPG)), linetype = "dashed") + scale_x_continuous(name="Points Per Game")
+rebounds_density <- ggplot(nba, aes(RPG)) + geom_density(fill = "hotpink3") + geom_vline(aes(xintercept = mean(RPG)), linetype = "dashed")+ scale_x_continuous(name="Rebounds Per Game")
+assists_density <- ggplot(nba, aes(APG)) + geom_density(fill = "darkcyan") + geom_vline(aes(xintercept = mean(APG)), linetype = "dashed") + scale_x_continuous(name="Assists Per Game")
+turnovers_density <- ggplot(nba, aes(TOPG)) + geom_density(fill = "blueviolet") + geom_vline(aes(xintercept = mean(TOPG)), linetype = "dashed") + scale_x_continuous(name="Turnovers Per Game")
+grid.arrange(points_density, rebounds_density, assists_density, turnovers_density, ncol = 2)
+```
+  
+The NBA is a star-driven league. Basketball is a sport where success is more closely correlated with how good your best player is than with how poor your worst player is. In these graphs, we can observe that the overall output (measured in points, rebounds, assists, and turnovers) is favorably skewed, with a lengthy tail pulling the mean away from the median. These characteristics demonstrate that the top performers are the most significant observations in our collection.
+
+#### Correlation Plot
+
+Positive correlations are shown in blue in the correlation plot above, while negative correlations are shown in red. The intensity of the color is determined by the correlation coefficient, therefore the darker the boxes will be the closer the correlation is to -1 or 1. On the other hand, lighter shades show values that are closer to zero (weaker linear relation). On the right side of the plot, the color legend shows the correlation coefficients and the associated hues.
+
+```{r plot4, fig.cap='Correlation matrix of NBA stats', fig.pos="H"}
+nba_corr <- subset(nba,select = -c(RANK,FULL.NAME,TEAM,POS))
+corr <- cor(nba_corr, use='pairwise.complete.obs', method = 'pearson')
+round(corr,2)
+corrplot(corr, type='upper', col = brewer.pal(n=8, name = "Spectral"), tl.cex = 0.5)
+```
+  
+The correlation plot, as expected, reveals primarily positive correlations between variables, albeit with varying degrees of intensity. It can be seen that some data have strong correlations with one another, which could lead to multicollinearity problems if the final model included both of those variables. It pretty clear that there aren't a lot of high negative correlation. The most negative correlation could be seen with Assists Per Game and Total Rebound Percentage.
+
+The EDA carried out above helps us in understanding how all the variables are related and how some of them are not. They play a crucial part in identifying our business questions and aid in generating our predictive model.
+
+#### Business Question 1 - 
+**Predict points scored using the basketball statistics, 2 point shots attempted, 3 point shots attempted, free throws attempted, assists per game and steals per game.**
+  
+The business question is solved by first splitting the data and generating models to see which variables, when used together produce best fitted one.  
+
+**Split Dataset** 
+
+For this task, we divided the dataset into training and test sets, using the former to train the model and the latter. To put it another way, when the model has been fitted to the training data, we can use it to predict fresh data (called test data) to see how well it performed on a different dataset. The dataset was divided into training and test datasets using the createDataPartition function of the caret package (). To guarantee that the outcomes would be the same regardless of how the data was divided, however, we first used set.seed ().
+
+```{r}
+set.seed(123)
+trainIndex <- createDataPartition(nba$PPG, p=0.7, list = FALSE)
+train <- nba[trainIndex,]
+test <- nba[-trainIndex,]
+```
+
+**Create Linear Models**
+  
+We create three models with different variables to see which model better fits the requirement.
+
+```{r}
+PointsScored <- lm(PPG ~ X2PA + X3PA + FTA + APG + SPG, data = train)
+PointsScored1 <- lm(PPG ~ X2PA + X3PA + FTA + APG + SPG + TRB, data = train)
+PointsScored2 <- lm(PPG ~ X2PA + FTA + APG + SPG + BPG, data = train)
+summary(PointsScored)
+summary(PointsScored1)
+summary(PointsScored2)
+```
+
+It can be observed that some of the coefficients of the variables are significantly closer to 0 for all three models, but further observations are made.
+
+In essence, residuals represent the difference between the response values that were seen and those that the model predicted. When assessing how well the model fit the data, it is imperative to look for a symmetrical distribution across these points on the mean value zero (0).
+
+Two unknowable constants, called coefficients in simple linear regression, stand in for the intercept and slope variables of the linear model. Due to the fact that they are all much closer to 0, we can see that all of the estimate values for our variables appear to be negligible.
+
+The fact that our R-squared value is a respectable 0.9108 for the first and second model and 0.8738 for the third model indicating that there is in fact a linear relationship between points per game and all of these basketball data proves that.
+
+#### Calculate AIC to find the best model.
+
+```{r}
+install.packages("AICcmodavg", repos = "http://cran.us.r-project.org")
+library(AICcmodavg)
+model12 <- list(PointsScored,PointsScored1,PointsScored2)
+modname <- c('Points','Points1', 'Points2' )
+aictab(cand.set = model12, modnames = modname)
+```
+
+The fit of various regression models is evaluated using the Akaike Information Criterion (AIC). The lowest AIC value is displayed on top. After comparing the AIC value of all three models, it is evident that the best fitting model is PointScored with the lowest AIC value compared to the other two models.
+
+**Plot the Linear Model**
+
+```{r plot5, fig.cap='Added Variable Plot of Linear Model', fig.pos="H"}
+avPlots(PointsScored)
+```
+
+A single predictor variable is shown on the x-axis, and the response variable is shown on the y-axis. While keeping the values of all other predictor variables constant, the blue line illustrates the relationship between the predictor variable and the response variable. The two observations with the biggest residuals and partial leverage are represented by the points that are labeled in each plot. A line's angle in each plot should match the sign of the coefficient from the computed regression equation, as can be seen.
+Seeing that all the variables display positive estimated coefficient, it shows that there is a positive relationship between each individual predictor variable and the response variable PPG while holding all the other predictor variables constant.
+
+**Sum of Squared Errors**
+
+```{r}
+SSE <- sum(PointsScored$residuals^2)
+SSE
+```
+
+The sum of squared errors is the sum of squared differences between the predictor variable points per game and the observed data points. Here the value is 1618.439, which is not a high value and could be considered as an interpretable value.
+
+**Mean Points Per Game**
+
+```{r}
+mean(train$PPG)
+```
+
+The mean of points per game scored is 9.
+
+**Root Mean Squared Error**
+
+```{r}
+RMSE <- sqrt(SSE/nrow(train))
+RMSE
+```
+
+For the model's fit to the training data, the Root Mean Squared Error (RMSE) score is 2.132 The average difference between the Grad.actual Rate's actual and expected values is shown by this statistic. As the model's fit to the data improves, the RMSE value declines. The RMSE score of 2.132 indicates that the fit model in this example performed moderately compared to the training set.
+
+**Prediction on Test Data**
+
+```{r}
+PointsPred <- predict(PointsScored, newdata = test)
+head(PointsPred)
+```
+
+Here, the points scored per game are predicted.
+
+**Calculate R Squared Value**
+
+```{r}
+SSE_test = sum((PointsPred - test$PPG)^2)
+SST_test = sum((mean(train$PPG) - test$PPG)^2)
+R2 = 1 - SSE_test/SST_test
+R2
+```
+
+The R Squared value is obtained from Sum of Squared Errors and Sum of Squares Total. It is determined to be 0.8923.
+
+**Compute Root Mean Squared Error**
+
+```{r}
+RMSE_test <- sqrt(SSE_test/nrow(test))
+RMSE_test
+```
+
+The RMSE of the train data vs the model's test set is found. The fitted model's RMSE in comparison to the test set is 2.264. You can assess a model's RMSE against both the training set and the test set to see whether it is overfit. Both the train set RMSE and the test RMSE significantly vary when a model is overfitted (RMSE). The RMSE of the training set has changed significantly less in this instance compared to the RMSE of the test set, indicating that the model is not overfit.
+
+#### Business Question 2 - 
+
+**Predict the position of the players.**
+  
+The position we plan to predict are Center (C), ComboForward (C-F), Forward (F), Forward/Center (F-C), Forward/Guard (F-G), Point Guard (G) and G-F (Guard/Forward). The position is predicted to determine what type of play suits the player better and who is better at passing the ball, defending the team and scoring points. 
+
+
+**Split data**
+
+In this portion, we remove all the variables that are unnecessary for the data split. Once that's done, we divided the dataset into training and test sets, using the former to train the model and the latter. To put it another way, when the model has been fitted to the training data, we can use it to predict fresh data (called test data) to see how well it performed on a different dataset.
+
+```{r}
+clean_nba <- nba %>%
+select(-c(RANK, FULL.NAME, TEAM, AGE, GP, RPG, TS_P, TO, FTA, FT_P, X2P_P, X3PA, X3P_P
+          , ORTG, DRTG, MIN, PPG, SPG, eFG_P, TOPG, APG, X2PA, VI, eFG, TS, MPG))
+head(clean_nba)
+
+nba.trainIndex <- createDataPartition(clean_nba$POS, p=0.8, list = FALSE)
+nba.train <- clean_nba[nba.trainIndex,]
+nba.test <- clean_nba[-nba.trainIndex,]
+```
+
+**Decision Tree**
+
+Decision trees create an estimate based on all the answers at the end by asking new questions based on the responses to earlier questions. Decision trees are straightforward to comprehend and analyze, and they are simple to picture. Based on the position of the player, using the train data we fit a decision tree model, to analyze how accurate the positions are predicted.
+
+```{r}
+fit <- rpart(nba.train$POS ~., data = nba.train, method="class")
+fit
+```
+
+**Plot the model**
+
+```{r plot6, fig.cap='Decision Tree', fig.pos="H"}
+rpart.plot(fit)
+```
+
+Starting at the top (the "root" node), we ask questions and move left or right in the tree depending on the response. This allows us to make predictions using the tree (left for true and right for false). Every time we move forward, a new node and inquiry are encountered. In this particular tree, we can see that the player is expected to be in the Pointer Guard position if TRB (Total Rebound) < 8.3 (different each time) and Assists is greater than 9. In fact, it is really simple to visualize and interpret.
+
+**Prediction on Test Data**
+
+```{r}
+predict_test <- predict(fit, nba.test, type = 'class')
+```
+
+The position of the player is predicted using the test data.
+
+**Confusion Matrix**
+
+```{r}
+table_test <- table(nba.test$POS, predict_test)
+table_test
+```
+
+The confusion matrix lets us identify the number of players that were predicted correctly to their positions. From the above matrix we can see 25 players were predicted correctly to be in the Point Guard position while 23 players were predicted to be correctly at position Forward. At the same, 1 Center/Forward player was predicted to be just Forward position players.
+
+**Calculate Accuracy**
+
+```{r}
+accuracy_Test <- sum(diag(table_test)) / sum(table_test)
+accuracy_Test
+```
+
+Upon testing how well our model is going to perform, we determined that the accuracy of the model is 54%. This tells us that 54% of the time, the position of the players are predicted correctly.
+
+\newpage
+
+## Conclusion
+
+From the above analysis, there is some relationship between the points per game, type of shots and players of a team. The first plot shows that all players attempted 2-point shots followed by 3-point shots. Jordan Poole achieved most 2-point shots while Stephen Curry attempted the most 3-point shots. From the second plot we know that in 15 teams with players have a total 1% free throws, team Minnesota Timberwolves and team Washington Wizards have top 3 players with 1% free throws. Toronto Raptors have top 2 players with 1 % free throws. Whereas other teams have an average of free throws between 0.90 and 0.85. we know that the overall output (measured in points, rebounds, assists, and turnovers) is favorably skewed, with a lengthy tail pulling the mean away from the median. These characteristics demonstrate that the top performers are the most significant observations in our collection. We know that some data have strong correlations with one another, which could lead to multicollinearity problems if the final model included both of those variables. The first business question is to know the influence of attempting 2 point shots and 3 point shots and free thows by players based on their individual points per game. We will be using simple linear regression model to identify the relationship. This will help us in knowing the impact of independent variables on the dependent variables.
+
+Linear regression model is applied to various predictor variables such as two point shots attempted, three point shots attempted, free throws attempted, assists per game and steals per game in order to find the best model that fit the prediction of the response variable, points per game. This helps us in identifying if there is a relationship between the variables. It allows us to determine how the points scored are affected by the other attributes of the player. It can be seen that the train and test model that we created have very minute difference in the root mean squared error, suggesting that the model is neither overfit nor underfit, making it an ideal model.
+
+Based on total rebounds, assists, usage, and blocks, a player's position may be predicted using each statistical metric. Each decision node represents the benchmark for that place and the meaning of that category. This categorization tree can be used to locate players and assist the team in deciding what each player's objective and area of concentration should be in each category. The classification tree can be further refined to focus on a particular team or group of players, or it can be expanded to include a team-based model of relevant statistics.
+
+\newpage
+
+## References
+
+- Bhalla, Deepanshu. “R: Keep / Drop Columns From Data Frame.” ListenData, www.listendata.com/2015/06/r-keep-drop-columns-from-data-frame.html. Accessed 5 Feb. 2023.
+- “How to Expand Color Palette With Ggplot and RColorBrewer | R-bloggers.” How to Expand Color Palette With Ggplot and RColorBrewer | R-bloggers, 13 Sept. 2013, www.r-bloggers.com/2013/09/how-to-expand-color-palette-with-ggplot-and-rcolorbrewer.
+- “Select the Top N Values by Group.” Stack Overflow, 10 Feb. 2013, stackoverflow.com/questions/14800161/select-the-top-n-values-by-group.
+- “NBA Analytics Tutorial – Part 1: Using R to Analyze the Chicago Bulls’ Last Dance | R-bloggers.” NBA Analytics Tutorial – Part 1: Using R to Analyze the Chicago Bulls’ Last Dance | R-bloggers, 19 Aug. 2021, www.r-bloggers.com/2021/08/nba-analytics-tutorial-part-1-using-r-to-analyze-the-chicago-bulls-last-dance.
+- “Barline Function - RDocumentation.” Barline Function - RDocumentation, www.rdocumentation.org/packages/BasketballAnalyzeR/versions/0.5.0/topics/barline. Accessed 5 Feb. 2023.
+- Zach, and View all posts by Zach. “How to Plot Multiple Linear Regression Results in R - Statology.” Statology, 23 Dec. 2020, www.statology.org/plot-multiple-linear-regression-in-r.
+- Zach, and View all posts by Zach. “How to Calculate SST, SSR, and SSE in R - Statology.” Statology, 22 Feb. 2021, www.statology.org/sst-ssr-sse-in-r.
+- “Decision Trees in R | R-bloggers.” Decision Trees in R | R-bloggers, 19 Apr. 2021, www.r-bloggers.com/2021/04/decision-trees-in-r.
+- “NBA Stats 2022/23: All Player Statistics in One Page.” NBAstuffer, 17 Oct. 2022, www.nbastuffer.com/2022-2023-nba-player-stats.
